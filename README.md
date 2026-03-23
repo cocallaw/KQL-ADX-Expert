@@ -135,6 +135,12 @@ kql-adx-expert/
 
 ---
 
+## Acknowledgments
+
+Thanks to Roeland Nieuwenhuis [ranieuwe](https://github.com/ranieuwe) for the inspiration and early feedback on the skill concept.
+
+---
+
 ## 📄 License
 
 This project is licensed under the **MIT License** — see the [LICENSE](LICENSE) file for details.
