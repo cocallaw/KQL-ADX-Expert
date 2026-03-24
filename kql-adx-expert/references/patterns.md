@@ -2,6 +2,8 @@
 
 Real-world KQL query patterns for Azure Monitor, Log Analytics, Microsoft Sentinel, and Azure Data Explorer.
 
+> **Sentinel-specific content**: For hunting queries organized by MITRE ATT&CK tactic, ASIM normalized schemas, watchlist/TI patterns, and Sentinel table reference, see **[sentinel.md](sentinel.md)**.
+
 ---
 
 ## Azure Monitor Core Tables
@@ -15,6 +17,9 @@ Real-world KQL query patterns for Azure Monitor, Log Analytics, Microsoft Sentin
 | `AzureActivity` | Azure control plane operations | Audit trail, change tracking |
 | `AzureDiagnostics` | Aggregated diagnostics (legacy mode) | Multi-resource diagnostics |
 | `SecurityEvent` | Windows Security Event Log | Authentication, access tracking |
+| `SigninLogs` | Microsoft Entra ID sign-in events | Sign-in analysis, brute force detection |
+| `AuditLogs` | Microsoft Entra ID audit events | Consent grants, role/app changes |
+| `CommonSecurityLog` | CEF-format device logs (firewalls, proxies) | Network security, C2 detection |
 
 ---
 

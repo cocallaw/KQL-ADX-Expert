@@ -1,18 +1,24 @@
 ---
 name: kql-adx-expert
-description: 'Kusto Query Language (KQL) and Azure Data Explorer (ADX) expert. Use when writing KQL queries, querying Azure Monitor or Log Analytics, building Kusto queries for Azure Data Explorer, analyzing telemetry or logs in Azure, writing queries to find data in ADX, debugging KQL errors, optimizing slow Kusto queries, parsing JSON in KQL, running or executing KQL queries against a live ADX cluster, exploring or spidering an ADX cluster to discover its schema, connecting to an ADX cluster, or working with Heartbeat, Perf, Syslog, SecurityEvent, or AzureDiagnostics tables. Triggers on KQL, Kusto query, Azure Data Explorer, ADX, Log Analytics query, Azure Monitor query, write a query to find, query telemetry, analyze logs in Azure, run query, execute query, connect to cluster, explore cluster, spider cluster, cluster schema.'
+description: 'Kusto Query Language (KQL) and Azure Data Explorer (ADX) expert. Use when writing KQL queries, querying Azure Monitor or Log Analytics, building Kusto queries for Azure Data Explorer, analyzing telemetry or logs in Azure, writing queries to find data in ADX, debugging KQL errors, optimizing slow Kusto queries, parsing JSON in KQL, running or executing KQL queries against a live ADX cluster, exploring or spidering an ADX cluster to discover its schema, connecting to an ADX cluster, working with Heartbeat, Perf, Syslog, SecurityEvent, SigninLogs, AuditLogs, CommonSecurityLog, AzureActivity, or AzureDiagnostics tables, writing Microsoft Sentinel hunting queries, building Sentinel detection or analytics rules, threat hunting with KQL, detecting brute force or password spray attacks, investigating security incidents with KQL, using ASIM normalized schemas, correlating threat intelligence indicators, working with MITRE ATT&CK techniques in Sentinel, building watchlist queries, or analyzing DeviceProcessEvents, DeviceNetworkEvents, or DeviceFileEvents from Defender for Endpoint. Triggers on KQL, Kusto query, Azure Data Explorer, ADX, Log Analytics query, Azure Monitor query, write a query to find, query telemetry, analyze logs in Azure, run query, execute query, connect to cluster, explore cluster, spider cluster, cluster schema, Sentinel hunting, threat hunting, detection rule, analytics rule, security query, brute force detection, ASIM, hunting query, MITRE ATT&CK, SecurityEvent, SigninLogs, CommonSecurityLog, DeviceProcessEvents.'
 ---
 
 # KQL & Azure Data Explorer Expert
 
-Write, optimize, and debug Kusto Query Language (KQL) queries for Azure Data Explorer, Azure Monitor Log Analytics, Microsoft Sentinel, and Microsoft Defender. This skill covers the full KQL language, ADX-specific concepts, performance optimization, and common Azure service query patterns.
+Write, optimize, and debug Kusto Query Language (KQL) queries for Azure Data Explorer, Azure Monitor Log Analytics, Microsoft Sentinel, and Microsoft Defender. This skill covers the full KQL language, ADX-specific concepts, performance optimization, common Azure service query patterns, and Microsoft Sentinel threat hunting and detection.
 
 ## How to Build KQL Queries
 
 Follow this process for every query:
 
 0. **Check for cluster schema** — If a `cluster_schema.json` file exists from a prior spider run, read it first. Use it to identify valid table and column names, and apply correct data types. If the user provides a cluster URI and no schema exists, suggest running the spider first: `python adx_tool.py spider --cluster <URI>`
-1. **Identify the table** — From the spider schema or known Azure Monitor tables: Heartbeat (VMs), Perf (metrics), SecurityEvent (auth), Syslog (Linux), AzureDiagnostics (resource logs)
+1. **Identify the table** — From the spider schema or known tables:
+   - **Azure Monitor**: Heartbeat (VMs), Perf (metrics), Syslog (Linux), AzureDiagnostics (resource logs)
+   - **Security**: SecurityEvent (Windows auth/process), SigninLogs (Entra ID sign-ins), AuditLogs (Entra ID changes), CommonSecurityLog (CEF firewalls/proxies)
+   - **Cloud**: AzureActivity (ARM operations), OfficeActivity (Office 365)
+   - **Defender for Endpoint**: DeviceProcessEvents, DeviceNetworkEvents, DeviceFileEvents, DeviceRegistryEvents
+   - **Sentinel-native**: SecurityAlert, SecurityIncident, ThreatIntelligenceIndicator, Watchlist, BehaviorAnalytics, SentinelAudit
+   - **ASIM (normalized)**: imAuthentication, imDns, imNetworkSession, imProcessCreate, imFileEvent, imWebSession — use these for cross-source hunting
 2. **Filter early with `where`** — time range first (`where TimeGenerated > ago(1h)`), then predicates
 3. **Project only needed columns** — `project` or `project-away` before joins/aggregations
 4. **Aggregate with `summarize`** — use `count()`, `avg()`, `dcount()`, `arg_max()`, etc. with `by` clause
@@ -115,6 +121,86 @@ AzureDiagnostics
 | Aggregation over billions of rows | **Materialized view** |
 | Dynamic multi-table analysis | **On-demand** with `materialize()` |
 
+## Microsoft Sentinel Threat Hunting
+
+When the user asks about threat hunting, detection rules, security investigations, or MITRE ATT&CK techniques, follow this process:
+
+### Hunting Query Workflow
+
+1. **Identify the threat scenario** — What tactic/technique? (e.g., brute force = T1110, lateral movement = T1021)
+2. **Select the right table** — Match the data source to the attack surface:
+   - Identity attacks → `SigninLogs`, `SecurityEvent`, `AuditLogs`
+   - Endpoint threats → `DeviceProcessEvents`, `DeviceFileEvents`, `DeviceRegistryEvents`
+   - Network threats → `CommonSecurityLog`, `DeviceNetworkEvents`, `DnsEvents`
+   - Cloud attacks → `AzureActivity`, `AuditLogs`, `OfficeActivity`
+   - Cross-source → Use ASIM parsers (e.g., `imAuthentication` for auth across all sources)
+3. **Build the detection logic** — Use appropriate patterns:
+   - **Threshold-based**: `summarize count() | where count_ > N`
+   - **Baseline comparison**: `leftanti` join against historical period
+   - **Time-series anomaly**: `make-series` + `series_decompose_anomalies`
+   - **IOC matching**: `join` with `ThreatIntelligenceIndicator` or `_GetWatchlist()`
+4. **Map entities** — Ensure output includes identifiable entities (Account, IP, Host) for incident creation
+5. **Tag MITRE ATT&CK** — Identify the tactic (TA00XX) and technique (T1XXX)
+
+### Key Sentinel Patterns
+
+#### Brute Force Detection
+
+```kql
+SigninLogs
+| where TimeGenerated > ago(1h)
+| where ResultType != "0"
+| summarize FailureCount = count(), DistinctAccounts = dcount(UserPrincipalName)
+    by IPAddress, bin(TimeGenerated, 1h)
+| where FailureCount > 30 or DistinctAccounts > 5
+```
+
+#### Cross-Source Hunting with ASIM
+
+```kql
+imAuthentication
+| where TimeGenerated > ago(1h)
+| where EventResult == "Failure"
+| summarize FailureCount = count(), Sources = make_set(EventProduct)
+    by TargetUsername, SrcIpAddr
+| where FailureCount > 20
+```
+
+#### Threat Intelligence Correlation
+
+```kql
+ThreatIntelligenceIndicator
+| where Active == true and ExpirationDateTime > now()
+| where isnotempty(NetworkIP)
+| join kind=inner (
+    CommonSecurityLog | where TimeGenerated > ago(1d)
+) on $left.NetworkIP == $right.DestinationIP
+| project TimeGenerated, SourceIP, DestinationIP, ThreatType, ConfidenceScore
+```
+
+#### Watchlist Enrichment
+
+```kql
+let VIPs = _GetWatchlist('VIPAccounts') | project SearchKey;
+SigninLogs
+| where TimeGenerated > ago(1h)
+| where UserPrincipalName in (VIPs)
+| where LocationDetails.countryOrRegion != "US"
+```
+
+#### Rare Activity Detection (Baseline Comparison)
+
+```kql
+let baseline = AzureActivity
+| where TimeGenerated between (ago(14d) .. ago(1d))
+| where ActivityStatusValue == "Success"
+| summarize by CallerIpAddress, Caller, OperationNameValue;
+AzureActivity
+| where TimeGenerated > ago(1d)
+| where ActivityStatusValue == "Success"
+| join kind=leftanti (baseline) on CallerIpAddress, Caller, OperationNameValue
+```
+
 ## Live Query Execution & Cluster Exploration
 
 This skill includes a Python CLI tool (`adx_tool.py`) that can run live KQL queries and explore ADX cluster schemas. The tool requires Python 3.9+ and the dependencies listed in `requirements.txt` (install with `pip install -r requirements.txt`).
@@ -184,4 +270,5 @@ The resulting JSON file contains the full structure of the cluster. When this fi
 For the complete operator reference, all join flavors, full scalar/aggregation function tables, ADX column types, policies, and management commands, see:
 
 - **[references/operators.md](references/operators.md)** — Full operator, function, and ADX concept reference
-- **[references/patterns.md](references/patterns.md)** — 10 annotated real-world query examples and Azure Monitor patterns
+- **[references/patterns.md](references/patterns.md)** — 10+ annotated real-world query examples and Azure Monitor patterns
+- **[references/sentinel.md](references/sentinel.md)** — Microsoft Sentinel hunting queries, MITRE ATT&CK-organized detection patterns, ASIM schemas, watchlist/TI correlation, and Sentinel table reference

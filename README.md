@@ -100,6 +100,11 @@ Try these in Copilot CLI to see the skill in action:
 | *"What's the difference between `has` and `contains` in KQL?"* | Explains semantics and performance trade-offs |
 | *"Run this query against my cluster: StormEvents \| summarize count() by State \| top 10 by count_"* | Executes the query live and returns results |
 | *"Help me build a time-series anomaly detection query"* | Walks through `make-series` and `series_decompose_anomalies` |
+| *"Write a Sentinel hunting query to detect brute force attacks in SigninLogs"* | Builds a threshold-based brute force detection query with MITRE mapping |
+| *"Hunt for password spray attacks across all authentication sources"* | Uses ASIM `imAuthentication` for cross-source detection |
+| *"Detect lateral movement via RDP in my Sentinel workspace"* | Queries SecurityEvent LogonType 10 with dcount thresholds |
+| *"Correlate my threat intelligence indicators with network traffic"* | Joins ThreatIntelligenceIndicator with CommonSecurityLog |
+| *"Build an analytics rule to detect anomalous Azure subscription operations"* | Uses leftanti join for baseline comparison detection |
 
 ---
 
@@ -113,7 +118,8 @@ kql-adx-expert/
 ├── README.md             # Detailed tool documentation and setup
 └── references/
     ├── operators.md      # Full KQL operator, function, and ADX concept reference
-    └── patterns.md       # 10+ annotated real-world query examples
+    ├── patterns.md       # 10+ annotated real-world query examples
+    └── sentinel.md       # Microsoft Sentinel hunting queries, MITRE ATT&CK patterns, ASIM
 ```
 
 ---
@@ -124,6 +130,7 @@ kql-adx-expert/
 
 - [`kql-adx-expert/references/operators.md`](kql-adx-expert/references/operators.md) — KQL operators, functions, and ADX concepts
 - [`kql-adx-expert/references/patterns.md`](kql-adx-expert/references/patterns.md) — Annotated real-world query examples
+- [`kql-adx-expert/references/sentinel.md`](kql-adx-expert/references/sentinel.md) — Microsoft Sentinel hunting queries, MITRE ATT&CK detection patterns, ASIM schemas, watchlist/TI correlation
 - [`kql-adx-expert/README.md`](kql-adx-expert/README.md) — Detailed Python tool documentation
 
 ### External Microsoft documentation
