@@ -4,6 +4,8 @@ Real-world KQL query patterns for Azure Monitor, Log Analytics, Microsoft Sentin
 
 > **Sentinel-specific content**: For hunting queries organized by MITRE ATT&CK tactic, ASIM normalized schemas, watchlist/TI patterns, and Sentinel table reference, see **[sentinel.md](sentinel.md)**.
 
+> **Azure resource monitoring**: For resource-specific table schemas and query patterns covering VMs, App Service, Functions, SQL, Storage, AKS, Key Vault, Networking, and Application Insights, see **[azure-resources.md](azure-resources.md)**.
+
 ---
 
 ## Azure Monitor Core Tables
@@ -20,6 +22,26 @@ Real-world KQL query patterns for Azure Monitor, Log Analytics, Microsoft Sentin
 | `SigninLogs` | Microsoft Entra ID sign-in events | Sign-in analysis, brute force detection |
 | `AuditLogs` | Microsoft Entra ID audit events | Consent grants, role/app changes |
 | `CommonSecurityLog` | CEF-format device logs (firewalls, proxies) | Network security, C2 detection |
+
+### Resource-Specific Tables (Preferred over AzureDiagnostics)
+
+| Table | Azure Resource | Common Use |
+|-------|---------------|------------|
+| `AzureMetrics` | All resources (platform metrics) | CPU, DTU, throughput trending |
+| `InsightsMetrics` | VMs (VM Insights) | Lightweight CPU, memory, disk metrics |
+| `AppServiceHTTPLogs` | App Service | HTTP request logs, error rates |
+| `FunctionAppLogs` | Azure Functions | Execution logs, error rates |
+| `StorageBlobLogs` | Azure Storage | Blob operation errors, latency, throttling |
+| `ContainerLogV2` | AKS | Container stdout/stderr logs |
+| `KubePodInventory` | AKS | Pod status and inventory |
+| `KubeEvents` | AKS | Kubernetes events (failures, scheduling) |
+| `AZKVAuditLogs` | Key Vault | Vault operations audit |
+| `AGWAccessLogs` | Application Gateway | Access logs, HTTP status codes |
+| `AZFWNetworkRule` | Azure Firewall | Network rule allow/deny |
+| `NTANetAnalytics` | NSG Flow Logs | Network flow analytics |
+| `AppRequests` | Application Insights | Incoming HTTP requests |
+| `AppDependencies` | Application Insights | Outgoing dependency calls |
+| `AppExceptions` | Application Insights | Application exceptions |
 
 ---
 

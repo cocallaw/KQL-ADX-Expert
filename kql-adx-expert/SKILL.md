@@ -1,6 +1,6 @@
 ---
 name: kql-adx-expert
-description: 'Kusto Query Language (KQL) and Azure Data Explorer (ADX) expert. Use when writing KQL queries, querying Azure Monitor or Log Analytics, building Kusto queries for Azure Data Explorer, analyzing telemetry or logs in Azure, writing queries to find data in ADX, debugging KQL errors, optimizing slow Kusto queries, parsing JSON in KQL, running or executing KQL queries against a live ADX cluster, exploring or spidering an ADX cluster to discover its schema, connecting to an ADX cluster, working with Heartbeat, Perf, Syslog, SecurityEvent, SigninLogs, AuditLogs, CommonSecurityLog, AzureActivity, or AzureDiagnostics tables, writing Microsoft Sentinel hunting queries, building Sentinel detection or analytics rules, threat hunting with KQL, detecting brute force or password spray attacks, investigating security incidents with KQL, using ASIM normalized schemas, correlating threat intelligence indicators, working with MITRE ATT&CK techniques in Sentinel, building watchlist queries, or analyzing DeviceProcessEvents, DeviceNetworkEvents, or DeviceFileEvents from Defender for Endpoint. Triggers on KQL, Kusto query, Azure Data Explorer, ADX, Log Analytics query, Azure Monitor query, write a query to find, query telemetry, analyze logs in Azure, run query, execute query, connect to cluster, explore cluster, spider cluster, cluster schema, Sentinel hunting, threat hunting, detection rule, analytics rule, security query, brute force detection, ASIM, hunting query, MITRE ATT&CK, SecurityEvent, SigninLogs, CommonSecurityLog, DeviceProcessEvents.'
+description: 'Kusto Query Language (KQL) and Azure Data Explorer (ADX) expert. Use when writing KQL queries, querying Azure Monitor or Log Analytics, building Kusto queries for Azure Data Explorer, analyzing telemetry or logs in Azure, writing queries to find data in ADX, debugging KQL errors, optimizing slow Kusto queries, parsing JSON in KQL, running or executing KQL queries against a live ADX cluster, exploring or spidering an ADX cluster to discover its schema, connecting to an ADX cluster, working with Heartbeat, Perf, Syslog, SecurityEvent, SigninLogs, AuditLogs, CommonSecurityLog, AzureActivity, or AzureDiagnostics tables, writing Microsoft Sentinel hunting queries, building Sentinel detection or analytics rules, threat hunting with KQL, detecting brute force or password spray attacks, investigating security incidents with KQL, using ASIM normalized schemas, correlating threat intelligence indicators, working with MITRE ATT&CK techniques in Sentinel, building watchlist queries, analyzing DeviceProcessEvents, DeviceNetworkEvents, or DeviceFileEvents from Defender for Endpoint, monitoring Azure VMs with Perf or InsightsMetrics, querying App Service HTTP logs or Function App logs, troubleshooting Azure SQL Database performance with AzureMetrics or AzureDiagnostics, analyzing Azure Storage blob queue or file logs, monitoring AKS containers with ContainerLogV2 or KubePodInventory, auditing Key Vault operations, querying Application Insights tables like AppRequests AppDependencies or AppExceptions, analyzing Application Gateway or Azure Firewall logs, or working with NSG flow analytics. Triggers on KQL, Kusto query, Azure Data Explorer, ADX, Log Analytics query, Azure Monitor query, write a query to find, query telemetry, analyze logs in Azure, run query, execute query, connect to cluster, explore cluster, spider cluster, cluster schema, Sentinel hunting, threat hunting, detection rule, analytics rule, security query, brute force detection, ASIM, hunting query, MITRE ATT&CK, SecurityEvent, SigninLogs, CommonSecurityLog, DeviceProcessEvents, Azure VM monitoring, App Service logs, Function App logs, SQL Database performance, Azure Storage logs, AKS container logs, Key Vault audit, Application Insights, AppRequests, Application Gateway, Azure Firewall, NSG flow, StorageBlobLogs, ContainerLogV2, AzureMetrics, InsightsMetrics, FunctionAppLogs, AppServiceHTTPLogs.'
 ---
 
 # KQL & Azure Data Explorer Expert
@@ -19,6 +19,18 @@ Follow this process for every query:
    - **Defender for Endpoint**: DeviceProcessEvents, DeviceNetworkEvents, DeviceFileEvents, DeviceRegistryEvents
    - **Sentinel-native**: SecurityAlert, SecurityIncident, ThreatIntelligenceIndicator, Watchlist, BehaviorAnalytics, SentinelAudit
    - **ASIM (normalized)**: imAuthentication, imDns, imNetworkSession, imProcessCreate, imFileEvent, imWebSession — use these for cross-source hunting
+   - **Azure Resource Monitoring** (resource-specific tables preferred over AzureDiagnostics):
+     - App Service → `AppServiceHTTPLogs`, `AppServiceConsoleLogs`, `AppServiceAppLogs`
+     - Azure Functions → `FunctionAppLogs`
+     - Azure SQL/PostgreSQL/MySQL → `AzureMetrics` (platform metrics) + `AzureDiagnostics` (query store, wait stats, errors)
+     - Azure Storage → `StorageBlobLogs`, `StorageQueueLogs`, `StorageTableLogs`, `StorageFileLogs`
+     - AKS → `ContainerLogV2`, `KubePodInventory`, `KubeNodeInventory`, `KubeEvents`
+     - Key Vault → `AZKVAuditLogs` (resource-specific) or `AzureDiagnostics` (legacy)
+     - Application Gateway → `AGWAccessLogs`, `AGWFirewallLogs`
+     - Azure Firewall → `AZFWNetworkRule`, `AZFWApplicationRule`
+     - NSG Flow Logs → `NTANetAnalytics`
+     - Application Insights → `AppRequests`, `AppDependencies`, `AppExceptions`, `AppTraces`
+     - Platform metrics (any resource) → `AzureMetrics` (filter by `ResourceProvider`)
 2. **Filter early with `where`** — time range first (`where TimeGenerated > ago(1h)`), then predicates
 3. **Project only needed columns** — `project` or `project-away` before joins/aggregations
 4. **Aggregate with `summarize`** — use `count()`, `avg()`, `dcount()`, `arg_max()`, etc. with `by` clause
@@ -120,6 +132,85 @@ AzureDiagnostics
 | Ad-hoc exploration | **On-demand query** |
 | Aggregation over billions of rows | **Materialized view** |
 | Dynamic multi-table analysis | **On-demand** with `materialize()` |
+
+## Azure Resource Monitoring & Troubleshooting
+
+When the user asks about monitoring, troubleshooting, or analyzing Azure resource performance and health, follow this process:
+
+### Resource Monitoring Workflow
+
+1. **Identify the Azure service** — What resource type? (VM, App Service, SQL DB, Storage, AKS, Key Vault, etc.)
+2. **Choose the right table** — Prefer resource-specific tables over AzureDiagnostics:
+   - For **platform metrics** (CPU, DTU, throughput) → `AzureMetrics` with `ResourceProvider` filter
+   - For **resource logs** → Use the resource-specific table (see table routing above)
+   - For **control-plane operations** (who created/deleted/modified a resource) → `AzureActivity`
+   - For **application telemetry** → `AppRequests`, `AppDependencies`, `AppExceptions` (Application Insights)
+3. **Use `_ResourceId`** — Filter by ARM resource ID for scoped queries; use `parse _ResourceId` to extract resource names
+4. **Apply the right pattern**:
+   - **Health check**: Threshold-based (`summarize | where value > threshold`)
+   - **Trend analysis**: `bin(TimeGenerated, interval)` + `render timechart`
+   - **Top-N analysis**: `top 10 by value desc` or `summarize | sort by`
+   - **Error investigation**: Filter by status codes, error levels, or failure categories
+   - **Anomaly detection**: `make-series` + `series_decompose_anomalies`
+
+### Key Resource Monitoring Patterns
+
+#### VM CPU Percentiles
+
+```kql
+Perf
+| where ObjectName == "Processor" and CounterName == "% Processor Time"
+    and InstanceName == "_Total"
+| summarize P50 = percentile(CounterValue, 50), P90 = percentile(CounterValue, 90)
+    by bin(TimeGenerated, 1h)
+| render timechart
+```
+
+#### App Service Health (Success Rate)
+
+```kql
+AppServiceHTTPLogs
+| summarize (count() - countif(ScStatus >= 500)) * 100.0 / count()
+    by bin(TimeGenerated, 5m), _ResourceId
+| render timechart
+```
+
+#### SQL Database CPU + Deadlocks
+
+```kql
+AzureMetrics
+| where ResourceProvider == "MICROSOFT.SQL"
+| where TimeGenerated >= ago(1h)
+| where MetricName in ("cpu_percent", "deadlock")
+| parse _ResourceId with * "/microsoft.sql/servers/" Server "/databases/" DB
+| summarize Max = max(Maximum), Avg = avg(Average) by Server, DB, MetricName
+```
+
+#### Storage Throttling Detection
+
+```kql
+StorageBlobLogs
+| where TimeGenerated > ago(1d) and StatusText contains "ServerBusy"
+| project TimeGenerated, OperationName, StatusCode, StatusText, _ResourceId
+```
+
+#### AKS Pod Failures
+
+```kql
+KubeEvents
+| where TimeGenerated > ago(1h)
+| where Reason in ("Failed", "BackOff", "Unhealthy", "FailedScheduling")
+| project TimeGenerated, Name, Namespace, Reason, Message
+```
+
+#### Application Insights — Failed Requests + Slow Dependencies
+
+```kql
+AppRequests
+| where TimeGenerated > ago(1h) and Success == false
+| summarize FailCount = count() by Name, ResultCode
+| sort by FailCount desc
+```
 
 ## Microsoft Sentinel Threat Hunting
 
@@ -271,4 +362,5 @@ For the complete operator reference, all join flavors, full scalar/aggregation f
 
 - **[references/operators.md](references/operators.md)** — Full operator, function, and ADX concept reference
 - **[references/patterns.md](references/patterns.md)** — 10+ annotated real-world query examples and Azure Monitor patterns
+- **[references/azure-resources.md](references/azure-resources.md)** — Azure resource monitoring tables, schemas, and query patterns for VMs, App Service, Functions, SQL, Storage, AKS, Key Vault, Networking, and Application Insights
 - **[references/sentinel.md](references/sentinel.md)** — Microsoft Sentinel hunting queries, MITRE ATT&CK-organized detection patterns, ASIM schemas, watchlist/TI correlation, and Sentinel table reference

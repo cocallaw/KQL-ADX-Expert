@@ -105,6 +105,12 @@ Try these in Copilot CLI to see the skill in action:
 | *"Detect lateral movement via RDP in my Sentinel workspace"* | Queries SecurityEvent LogonType 10 with dcount thresholds |
 | *"Correlate my threat intelligence indicators with network traffic"* | Joins ThreatIntelligenceIndicator with CommonSecurityLog |
 | *"Build an analytics rule to detect anomalous Azure subscription operations"* | Uses leftanti join for baseline comparison detection |
+| *"Query my App Service HTTP logs for 5xx errors and show error rates"* | Queries AppServiceHTTPLogs with success rate calculation |
+| *"Monitor Azure SQL Database CPU and deadlocks in the past hour"* | Uses AzureMetrics with ResourceProvider filter and parse _ResourceId |
+| *"Find storage throttling events in my blob storage account"* | Queries StorageBlobLogs for ServerBusy status |
+| *"Show me failing pods and container errors in my AKS cluster"* | Queries KubeEvents and ContainerLogV2 for failures |
+| *"Check Key Vault for slow requests and top callers"* | Queries AZKVAuditLogs or AzureDiagnostics for latency and caller analysis |
+| *"Build a unified health dashboard across VMs, App Service, and SQL"* | Uses union pattern across Heartbeat, AppServiceHTTPLogs, and AzureMetrics |
 
 ---
 
@@ -119,6 +125,7 @@ kql-adx-expert/
 └── references/
     ├── operators.md      # Full KQL operator, function, and ADX concept reference
     ├── patterns.md       # 10+ annotated real-world query examples
+    ├── azure-resources.md # Azure resource monitoring — tables, schemas, query patterns
     └── sentinel.md       # Microsoft Sentinel hunting queries, MITRE ATT&CK patterns, ASIM
 ```
 
@@ -130,6 +137,7 @@ kql-adx-expert/
 
 - [`kql-adx-expert/references/operators.md`](kql-adx-expert/references/operators.md) — KQL operators, functions, and ADX concepts
 - [`kql-adx-expert/references/patterns.md`](kql-adx-expert/references/patterns.md) — Annotated real-world query examples
+- [`kql-adx-expert/references/azure-resources.md`](kql-adx-expert/references/azure-resources.md) — Azure resource monitoring tables, schemas, and query patterns (VMs, App Service, SQL, Storage, AKS, Key Vault, Networking, App Insights)
 - [`kql-adx-expert/references/sentinel.md`](kql-adx-expert/references/sentinel.md) — Microsoft Sentinel hunting queries, MITRE ATT&CK detection patterns, ASIM schemas, watchlist/TI correlation
 - [`kql-adx-expert/README.md`](kql-adx-expert/README.md) — Detailed Python tool documentation
 
