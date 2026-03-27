@@ -88,7 +88,9 @@ This saves a JSON file containing the full cluster schema. The skill uses this f
 
 The tool uses **interactive browser login** via `azure-identity.InteractiveBrowserCredential`. The first time you run a command a browser window will open for you to authenticate with your Entra ID credentials.
 
-Tokens are cached persistently across process invocations using MSAL's token-cache feature (`TokenCachePersistenceOptions`). The cache is stored under the name **`kql-adx-expert`** in the platform's secure storage:
+### Persistent token caching
+
+Tokens can be cached persistently across process invocations using MSAL's token-cache feature (`TokenCachePersistenceOptions`). When persistent caching is active the cache is stored under the name **`kql-adx-expert`** in the platform's secure storage:
 
 | Platform | Storage location |
 |---|---|
@@ -98,6 +100,22 @@ Tokens are cached persistently across process invocations using MSAL's token-cac
 | Linux (no keyring) | No persistent cache by default (see below) |
 
 As long as the cached access or refresh token has not expired, subsequent `query` and `spider` invocations against the same tenant will reuse it without opening a browser. If the token expires or is revoked, the tool will automatically prompt for re-authentication.
+
+#### Required dependency: `azure-identity[cache]`
+
+Persistent caching relies on the **`msal-extensions`** package, which is pulled in by installing the `[cache]` extra of `azure-identity`. The project's `requirements.txt` already includes this extra:
+
+```
+azure-identity[cache]>=1.15.0
+```
+
+If you installed plain `azure-identity` (without the `[cache]` extra), `msal-extensions` will be missing. In that case the tool **silently disables persistence** — it will not crash, but every invocation will open a browser prompt for authentication. To fix this, install the extra:
+
+```bash
+pip install "azure-identity[cache]>=1.15.0"
+```
+
+> **Troubleshooting — prompted to log in every time?** Verify that `msal-extensions` is installed (`pip show msal-extensions`). If it is missing, install the cache extra as shown above. On Linux, also confirm that a keyring daemon (e.g., `gnome-keyring`, `kwallet`) is running, or use `--allow-unencrypted-cache`.
 
 ### Linux without a keyring daemon
 

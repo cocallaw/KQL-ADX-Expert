@@ -54,7 +54,7 @@ pip install -r kql-adx-expert/requirements.txt
 | **Authentication** | Interactive browser login via Entra ID (Azure AD) |
 | **Access** | Entra ID credentials with permissions to the target ADX cluster |
 
-Key dependencies: `azure-kusto-data >= 4.0.0`, `azure-identity >= 1.15.0`, `tabulate >= 0.9.0`
+Key dependencies: `azure-kusto-data >= 4.0.0`, `azure-identity[cache] >= 1.15.0` (the `[cache]` extra enables persistent token caching via `msal-extensions`), `tabulate >= 0.9.0`
 
 ---
 
