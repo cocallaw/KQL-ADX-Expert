@@ -37,13 +37,24 @@ def create_client(cluster_uri: str, allow_unencrypted_cache: bool = False) -> Ku
     otherwise no persistence is used and each process must authenticate
     independently.
     """
-    cache_options = TokenCachePersistenceOptions(
-        name="kql-adx-expert",
-        allow_unencrypted_storage=allow_unencrypted_cache,
-    )
-    credential = InteractiveBrowserCredential(
-        cache_persistence_options=cache_options,
-    )
+    cache_options = None
+    try:
+        cache_options = TokenCachePersistenceOptions(
+            name="kql-adx-expert",
+            allow_unencrypted_storage=allow_unencrypted_cache,
+        )
+    except Exception:
+        # If persistent-cache support (e.g., msal-extensions via azure-identity[cache])
+        # is not available or fails to initialize, fall back to a credential
+        # without cache persistence to avoid breaking the CLI.
+        cache_options = None
+
+    if cache_options is not None:
+        credential = InteractiveBrowserCredential(
+            cache_persistence_options=cache_options,
+        )
+    else:
+        credential = InteractiveBrowserCredential()
     kcsb = KustoConnectionStringBuilder.with_azure_token_credential(cluster_uri, credential)
     return KustoClient(kcsb)
 
