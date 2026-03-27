@@ -5,7 +5,9 @@ Subcommands:
     query   Run a KQL query against an ADX cluster and print results.
     spider  Explore an ADX cluster and save schema as JSON.
 
-Authentication uses interactive browser login (Entra ID).
+Authentication uses interactive browser login (Entra ID) with a persistent
+token cache so that repeat invocations within the same user session do not
+require a new browser-based auth flow.
 """
 
 import argparse
@@ -13,7 +15,7 @@ import json
 import sys
 from datetime import datetime, timezone
 
-from azure.identity import InteractiveBrowserCredential
+from azure.identity import InteractiveBrowserCredential, TokenCachePersistenceOptions
 from azure.kusto.data import KustoClient, KustoConnectionStringBuilder
 from tabulate import tabulate
 
@@ -22,11 +24,26 @@ from tabulate import tabulate
 # Authentication
 # ---------------------------------------------------------------------------
 
-def create_client(cluster_uri: str) -> KustoClient:
-    """Create an authenticated KustoClient using interactive browser login."""
-    credential = InteractiveBrowserCredential()
-    kcsb = KustoConnectionStringBuilder.with_aad_device_authentication(cluster_uri)
-    # Override with InteractiveBrowserCredential via azure-identity
+def create_client(cluster_uri: str, allow_unencrypted_cache: bool = False) -> KustoClient:
+    """Create an authenticated KustoClient using interactive browser login.
+
+    Tokens are persisted to the system's secure storage (Windows Credential
+    Manager, macOS Keychain, Linux keyring) under the cache name
+    ``kql-adx-expert``.  Subsequent invocations within the token's lifetime
+    will reuse the cached credential and skip the browser prompt.
+
+    On Linux systems without a keyring daemon the cache falls back to an
+    unencrypted local file only when *allow_unencrypted_cache* is ``True``;
+    otherwise no persistence is used and each process must authenticate
+    independently.
+    """
+    cache_options = TokenCachePersistenceOptions(
+        name="kql-adx-expert",
+        allow_unencrypted_storage=allow_unencrypted_cache,
+    )
+    credential = InteractiveBrowserCredential(
+        cache_persistence_options=cache_options,
+    )
     kcsb = KustoConnectionStringBuilder.with_azure_token_credential(cluster_uri, credential)
     return KustoClient(kcsb)
 
@@ -64,7 +81,7 @@ def handle_query(args: argparse.Namespace) -> None:
         print("Error: Provide --query or --file.", file=sys.stderr)
         sys.exit(1)
 
-    client = create_client(args.cluster)
+    client = create_client(args.cluster, allow_unencrypted_cache=args.allow_unencrypted_cache)
     run_query(client, args.database, query_text)
 
 
@@ -134,7 +151,7 @@ def spider_cluster(client: KustoClient, cluster_uri: str) -> dict:
 
 def handle_spider(args: argparse.Namespace) -> None:
     """Handle the 'spider' subcommand."""
-    client = create_client(args.cluster)
+    client = create_client(args.cluster, allow_unencrypted_cache=args.allow_unencrypted_cache)
     print(f"Spidering cluster: {args.cluster}")
 
     schema = spider_cluster(client, args.cluster)
@@ -172,12 +189,32 @@ def main() -> None:
     query_group = query_parser.add_mutually_exclusive_group(required=True)
     query_group.add_argument("--query", help="KQL query string")
     query_group.add_argument("--file", help="Path to a .kql file containing the query")
+    query_parser.add_argument(
+        "--allow-unencrypted-cache",
+        action="store_true",
+        default=False,
+        help=(
+            "Allow the token cache to fall back to an unencrypted local file on systems "
+            "that lack a secure keyring (e.g. headless Linux). Off by default to follow "
+            "security best practices."
+        ),
+    )
     query_parser.set_defaults(func=handle_query)
 
     # -- spider subcommand --
     spider_parser = subparsers.add_parser("spider", help="Explore an ADX cluster and save schema as JSON.")
     spider_parser.add_argument("--cluster", required=True, help="ADX cluster URI (e.g., https://mycluster.region.kusto.windows.net)")
     spider_parser.add_argument("--output", default="cluster_schema.json", help="Output JSON file path (default: cluster_schema.json)")
+    spider_parser.add_argument(
+        "--allow-unencrypted-cache",
+        action="store_true",
+        default=False,
+        help=(
+            "Allow the token cache to fall back to an unencrypted local file on systems "
+            "that lack a secure keyring (e.g. headless Linux). Off by default to follow "
+            "security best practices."
+        ),
+    )
     spider_parser.set_defaults(func=handle_spider)
 
     args = parser.parse_args()

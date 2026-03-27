@@ -86,13 +86,38 @@ This saves a JSON file containing the full cluster schema. The skill uses this f
 
 ## Authentication
 
-The tool uses **interactive browser login** via `azure-identity.InteractiveBrowserCredential`. When you run a command, a browser window will open for you to authenticate with your Entra ID credentials. Tokens are cached for subsequent requests within the same session.
+The tool uses **interactive browser login** via `azure-identity.InteractiveBrowserCredential`. The first time you run a command a browser window will open for you to authenticate with your Entra ID credentials.
+
+Tokens are cached persistently across process invocations using MSAL's token-cache feature (`TokenCachePersistenceOptions`). The cache is stored under the name **`kql-adx-expert`** in the platform's secure storage:
+
+| Platform | Storage location |
+|---|---|
+| Windows | Windows Credential Manager |
+| macOS | Keychain |
+| Linux (with keyring daemon) | Secret Service / keyring |
+| Linux (no keyring) | No persistent cache by default (see below) |
+
+As long as the cached access or refresh token has not expired, subsequent `query` and `spider` invocations against the same tenant will reuse it without opening a browser. If the token expires or is revoked, the tool will automatically prompt for re-authentication.
+
+### Linux without a keyring daemon
+
+On headless Linux systems that have no secure keyring available, persistent caching is disabled by default to protect token security. You can opt in to an unencrypted local file cache by adding the `--allow-unencrypted-cache` flag:
+
+```bash
+python adx_tool.py query \
+  --cluster https://mycluster.region.kusto.windows.net \
+  --database MyDB \
+  --query "StormEvents | take 10" \
+  --allow-unencrypted-cache
+```
+
+> **Security note:** When `--allow-unencrypted-cache` is used the token cache is stored as a plaintext file on disk. Use this option only in trusted, single-user environments.
 
 ## CLI Reference
 
 ```text
-adx_tool.py query --cluster URL --database DB (--query KQL | --file PATH)
-adx_tool.py spider --cluster URL [--output PATH]
+adx_tool.py query --cluster URL --database DB (--query KQL | --file PATH) [--allow-unencrypted-cache]
+adx_tool.py spider --cluster URL [--output PATH] [--allow-unencrypted-cache]
 ```
 
 | Argument    | Description                                                          |
@@ -102,6 +127,7 @@ adx_tool.py spider --cluster URL [--output PATH]
 | `--query`   | Inline KQL query string                                              |
 | `--file`    | Path to a `.kql` file                                                |
 | `--output`  | Spider output file path (default: `cluster_schema.json`)             |
+| `--allow-unencrypted-cache` | Allow token cache to fall back to an unencrypted file on systems without a secure keyring (off by default) |
 
 ## How the Skill Uses This Tool
 
