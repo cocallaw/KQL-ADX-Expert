@@ -1,0 +1,3 @@
+# Use this file instead of requirements.txt on networks that require the Microsoft package feed proxy.
+--index-url https://packagefeedproxy.microsoft.io/pypi/simple/
+-r requirements.txt

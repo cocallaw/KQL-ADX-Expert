@@ -45,8 +45,12 @@ The skill auto-activates when you use relevant keywords such as *KQL*, *Kusto qu
 > Only required if you want **live query execution** or **cluster schema discovery**.
 
 ```bash
-pip install -r kql-adx-expert/requirements.txt
+python3 -m venv kql-adx-expert/.venv
+kql-adx-expert/.venv/bin/python -m pip install -r kql-adx-expert/requirements.txt
+kql-adx-expert/.venv/bin/python kql-adx-expert/adx_tool.py doctor
 ```
+
+Behind the Microsoft package feed proxy, install from `requirements-msft.txt` instead. See [kql-adx-expert/README.md](kql-adx-expert/README.md) for `doctor` and exit codes.
 
 | Requirement | Details |
 |---|---|

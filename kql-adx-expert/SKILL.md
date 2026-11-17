@@ -97,11 +97,18 @@ Do this before writing anything. It decides which column names, limits, and tool
 
 See [Live Query Execution & Cluster Exploration](#live-query-execution--cluster-exploration) for commands. The process:
 
-1. **Confirm you have** a cluster URI and a database name. If the database is missing, read it from the schema file or ask. Never guess one.
-2. **Check the statement is read-only** — a query, or a `.show` command. Anything else: stop (see Never).
-3. **Bound it** — a time filter, and `take` / `top` on row-level output.
-4. **Tell the user a browser sign-in window will open**, then run it.
-5. **Report results** in the output format. If the tool errors, show the error text verbatim and go to Workflow B.
+1. **Confirm you have** a cluster URI and a database name. If the database is missing, read it from the schema file or ask. Never guess one. (The spider needs only the cluster; pass `--database` when the user named one.)
+2. **Run `doctor --cluster <uri>` first** (see [Setup](#setup)). On any FAIL, show the FAIL lines and their fix, and stop. Do not continue to sign-in.
+3. **Check the statement is read-only** — a query, or a `.show` command. Anything else: stop (see Never).
+4. **Bound it** — a time filter, and `take` / `top` on row-level output.
+5. **Only after doctor passes, tell the user a browser sign-in window will open**, then run it.
+6. **Report results** in the output format. If the tool fails, show its error line verbatim and act on the exit code:
+
+   | Exit | Meaning | Next step |
+   |------|---------|-----------|
+   | 1 | Setup — missing packages, pip, or bad arguments | Follow the printed fix, then re-run `doctor` |
+   | 2 | Network — cluster unreachable | Ask the user to check VPN, network, or private endpoint. Do not retry sign-in |
+   | 3 | Authentication, permission, or query rejected by the cluster | Auth/permission: the user needs access to that cluster or database. Query error: go to Workflow B |
 
 ## Output Format
 
@@ -146,6 +153,7 @@ Use this structure every time. Leave out a section only when it has nothing to s
 - **Never commit `cluster_schema.json`** or suggest committing it — it maps the user's internal data estate.
 - **Never use `search *`, `union *`, or `contains` across a whole table** without a time filter and a stated reason.
 - **Never use `adx_tool.py` against a Log Analytics workspace, Sentinel, or Defender.** It targets ADX cluster URIs. Hand the user the query instead.
+- **Never start a sign-in after `doctor` reports a FAIL**, and never install packages into the system Python.
 
 ## Examples of a Great Result
 
@@ -178,7 +186,7 @@ StormEvents
 Save the query as `storm_damage.kql`, then:
 
 ```bash
-python <skill-dir>/adx_tool.py query --cluster https://help.kusto.windows.net --database Samples --file storm_damage.kql
+<venv-python> <skill-dir>/adx_tool.py query --cluster https://help.kusto.windows.net --database Samples --file storm_damage.kql
 ```
 ````
 
@@ -485,9 +493,30 @@ AzureActivity
 This skill includes a Python CLI tool, `adx_tool.py`, that runs KQL against a live ADX cluster and discovers cluster schemas.
 
 - **Location:** the same directory as this `SKILL.md`. Call it by its full path — the user's working directory is usually somewhere else. `<skill-dir>` below stands for that path.
-- **Requirements:** Python 3.9+ and `pip install -r <skill-dir>/requirements.txt`. If an import fails, give the user that command; do not install packages yourself without asking.
-- **Authentication:** interactive browser sign-in (Entra ID). Warn the user before the first command.
+- **Interpreter:** always run it as `<venv-python> <skill-dir>/adx_tool.py`. Never `./adx_tool.py` and never a bare `python` / `python3`: the script's `#!/usr/bin/env python3` shebang picks the system interpreter, which does not see packages installed in the venv.
+- **Authentication:** interactive browser sign-in (Entra ID). Warn the user only after `doctor` passes.
 - **Scope:** ADX cluster URIs only. It runs any statement it is given, including management commands — apply the Never rules before every call.
+
+### Setup
+
+Use a virtual environment in the skill directory. Never install into the system Python. Creating the venv and installing packages changes the user's machine, so ask before doing either.
+
+`<venv-python>` is `<skill-dir>/.venv/bin/python` on macOS/Linux and `<skill-dir>\.venv\Scripts\python.exe` on Windows.
+
+1. **Create or reuse the venv** — skip if `<venv-python>` already exists:
+   ```bash
+   python3 -m venv <skill-dir>/.venv
+   ```
+2. **Run doctor** and follow each FAIL line's fix in order:
+   ```bash
+   <venv-python> <skill-dir>/adx_tool.py doctor --cluster https://<cluster>.<region>.kusto.windows.net
+   ```
+   - `pip: missing` → `<venv-python> -m ensurepip --upgrade`
+   - `import ...: not installed` → `<venv-python> -m pip install -r <skill-dir>/requirements.txt`. On networks that require the Microsoft package feed proxy, use `requirements-msft.txt` instead. Doctor prints both.
+   - `cluster reachable: cannot reach` → network or VPN problem. The user must fix it; nothing in the venv will help.
+3. **Repeat doctor until every check passes.** Doctor never signs in, so it is safe to run as often as needed.
+
+Doctor prints the interpreter path and where each package was found. If packages are installed but a command still reports them missing, compare that path with the interpreter the command used.
 
 ### When to Spider vs Query
 
@@ -501,13 +530,13 @@ This skill includes a Python CLI tool, `adx_tool.py`, that runs KQL against a li
 Write the query to a `.kql` file and pass it with `--file`. KQL is full of double quotes, pipes, and `$left` / `$right`, which the shell will mangle inside `--query`.
 
 ```bash
-python <skill-dir>/adx_tool.py query --cluster https://<cluster>.<region>.kusto.windows.net --database <database> --file my_query.kql
+<venv-python> <skill-dir>/adx_tool.py query --cluster https://<cluster>.<region>.kusto.windows.net --database <database> --file my_query.kql
 ```
 
 `--query` is fine for a one-liner with no quotes or `$`:
 
 ```bash
-python <skill-dir>/adx_tool.py query --cluster https://<cluster>.<region>.kusto.windows.net --database <database> --query "StormEvents | take 10"
+<venv-python> <skill-dir>/adx_tool.py query --cluster https://<cluster>.<region>.kusto.windows.net --database <database> --query "StormEvents | take 10"
 ```
 
 The tool prints every returned row as a grid, followed by `(N row(s) returned)`, or `(query returned no results)`. It has no row cap of its own, so the query must carry one.
@@ -515,10 +544,13 @@ The tool prints every returned row as a grid, followed by `(N row(s) returned)`,
 ### Cluster Spider — Schema Discovery
 
 ```bash
-python <skill-dir>/adx_tool.py spider --cluster https://<cluster>.<region>.kusto.windows.net --output cluster_schema.json
+<venv-python> <skill-dir>/adx_tool.py spider --cluster https://<cluster>.<region>.kusto.windows.net --database <database> --output cluster_schema.json
 ```
 
-The spider runs `.show databases`, `.show tables`, and `.show table schema` across the whole cluster. On a large cluster it takes a while; tell the user. Databases or tables it cannot read are reported as warnings and appear with an empty `tables` or `columns` list — an empty list means *unreadable*, not *empty*.
+- **Scope:** `--database` (repeatable) limits discovery to the named databases. Use it whenever the user named a database. Omit it only when the user wants the whole cluster, and warn that a large cluster takes a while.
+- **Visibility:** `.show databases` returns only the databases the signed-in account can see. A named database that is missing is reported as a failure, usually meaning no access.
+- **Progress:** one line per database on stderr, with its table count and elapsed time. The final summary gives succeeded and failed counts for databases and tables.
+- **Failures:** databases or tables it cannot read appear with an empty `tables` or `columns` list — an empty list means *unreadable*, not *empty*.
 
 When the schema file is available, **always consult it first** to:
 - Use correct table and column names (no guessing)
