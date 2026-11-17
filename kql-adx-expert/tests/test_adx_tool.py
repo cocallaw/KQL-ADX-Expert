@@ -102,3 +102,40 @@ def test_doctor_fails_and_prints_install_command_when_sdk_missing(capsys: pytest
     assert exit_info.value.code == adx_tool.EXIT_SETUP
     assert "[FAIL] import azure.kusto.data" in out
     assert "requirements.txt" in out and "requirements-msft.txt" in out
+
+
+# ---------------------------------------------------------------------------
+# exit codes
+# ---------------------------------------------------------------------------
+
+def test_spider_exits_service_error_but_saves_schema_when_database_missing(tmp_path: Path) -> None:
+    output = tmp_path / "schema.json"
+    args = argparse.Namespace(cluster=CLUSTER, database=["Missing"], output=str(output))
+    with mock.patch.object(adx_tool, "require_deps"), \
+         mock.patch.object(adx_tool, "preflight_network"), \
+         mock.patch.object(adx_tool, "create_client", return_value=_fake_client()):
+        with pytest.raises(SystemExit) as exit_info:
+            adx_tool.handle_spider(args)
+
+    assert exit_info.value.code == adx_tool.EXIT_SERVICE
+    assert json.loads(output.read_text())["databases"] == []
+
+
+def test_spider_complete_discovery_exits_normally(tmp_path: Path) -> None:
+    args = argparse.Namespace(cluster=CLUSTER, database=["Samples"], output=str(tmp_path / "schema.json"))
+    with mock.patch.object(adx_tool, "require_deps"), \
+         mock.patch.object(adx_tool, "preflight_network"), \
+         mock.patch.object(adx_tool, "create_client", return_value=_fake_client()):
+        adx_tool.handle_spider(args)  # no SystemExit
+
+
+@pytest.mark.parametrize("argv, code", [
+    (["query", "--cluster", CLUSTER, "--query", "print 1"], adx_tool.EXIT_SETUP),  # missing --database
+    (["bogus"], adx_tool.EXIT_SETUP),
+    (["spider", "--help"], 0),
+])
+def test_argument_errors_use_setup_exit_code(argv: list[str], code: int) -> None:
+    with mock.patch.object(sys, "argv", ["adx_tool.py", *argv]):
+        with pytest.raises(SystemExit) as exit_info:
+            adx_tool.main()
+    assert exit_info.value.code == code

@@ -50,9 +50,9 @@ Always run the tool with the venv's interpreter. `./adx_tool.py` uses the `#!/us
 | Exit code | Meaning |
 |-----------|---------|
 | 0 | Success |
-| 1 | Setup problem: missing packages or pip, or a failed doctor check |
+| 1 | Setup problem: missing packages or pip, bad arguments, or a failed doctor check |
 | 2 | Network: cluster unreachable (VPN, network, private endpoint) |
-| 3 | Authentication, permission, or query rejected by the cluster |
+| 3 | Authentication, permission, query rejected by the cluster, or spider discovery incomplete (partial schema still saved) |
 
 ## Usage
 

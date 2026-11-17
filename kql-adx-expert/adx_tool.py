@@ -8,7 +8,8 @@ Subcommands:
 
 Authentication uses interactive browser login (Entra ID).
 
-Exit codes: 0 success, 1 setup problem, 2 network/VPN, 3 auth, permission, or service error.
+Exit codes: 0 success, 1 setup problem or bad arguments, 2 network/VPN,
+3 auth, permission, service error, or incomplete spider discovery.
 """
 
 import argparse
@@ -321,7 +322,9 @@ def handle_spider(args: argparse.Namespace) -> None:
     print(f"  Columns:   {total_columns}")
     print(f"\nSchema saved to: {args.output}")
     if stats["db_failed"] or stats["tables_failed"]:
-        print("Note: failed items appear with empty lists in the JSON — that means unreadable, not empty.")
+        print("Discovery incomplete: the errors and warnings above list what failed. The partial schema was saved; "
+              "an empty list in it can mean empty or unreadable, so check those messages.", file=sys.stderr)
+        sys.exit(EXIT_SERVICE)
 
 
 # ---------------------------------------------------------------------------
@@ -361,8 +364,17 @@ def run_with_error_handling(args: argparse.Namespace) -> None:
         raise
 
 
+class SetupExitParser(argparse.ArgumentParser):
+    """ArgumentParser that exits with EXIT_SETUP on bad arguments (argparse's own 2 means network here)."""
+
+    def error(self, message: str) -> None:
+        self.print_usage(sys.stderr)
+        print(f"{self.prog}: error: {message}", file=sys.stderr)
+        sys.exit(EXIT_SETUP)
+
+
 def main() -> None:
-    parser = argparse.ArgumentParser(
+    parser = SetupExitParser(
         prog="adx_tool",
         description="Query runner and cluster spider for Azure Data Explorer.",
     )

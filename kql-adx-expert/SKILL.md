@@ -100,7 +100,7 @@ See [Live Query Execution & Cluster Exploration](#live-query-execution--cluster-
 1. **Confirm you have** a cluster URI and a database name. If the database is missing, read it from the schema file or ask. Never guess one. (The spider needs only the cluster; pass `--database` when the user named one.)
 2. **Run `doctor --cluster <uri>` first** (see [Setup](#setup)). On any FAIL, show the FAIL lines and their fix, and stop. Do not continue to sign-in.
 3. **Check the statement is read-only** — a query, or a `.show` command. Anything else: stop (see Never).
-4. **Bound it** — a time filter, and `take` / `top` on row-level output.
+4. **Bound data queries** — a time filter, and `take` / `top` on row-level output. The spider and `.show` commands read metadata and need neither.
 5. **Only after doctor passes, tell the user a browser sign-in window will open**, then run it.
 6. **Report results** in the output format. If the tool fails, show its error line verbatim and act on the exit code:
 
@@ -108,7 +108,7 @@ See [Live Query Execution & Cluster Exploration](#live-query-execution--cluster-
    |------|---------|-----------|
    | 1 | Setup — missing packages, pip, or bad arguments | Follow the printed fix, then re-run `doctor` |
    | 2 | Network — cluster unreachable | Ask the user to check VPN, network, or private endpoint. Do not retry sign-in |
-   | 3 | Authentication, permission, or query rejected by the cluster | Auth/permission: the user needs access to that cluster or database. Query error: go to Workflow B |
+   | 3 | Authentication, permission, query rejected by the cluster, or spider discovery incomplete | Auth/permission: the user needs access to that cluster or database. Query error: go to Workflow B. Incomplete spider: the partial schema was saved; report the databases and tables named in the error lines |
 
 ## Output Format
 
@@ -450,10 +450,11 @@ imAuthentication
 
 ```kql
 let IOCs = ThreatIntelligenceIndicator
-    | where TimeGenerated > ago(14d)
+    | where TimeGenerated > ago(14d)   // indicators not re-ingested within 14 days are missed; widen if feeds refresh less often
+    | summarize arg_max(TimeGenerated, *) by IndicatorId   // latest version first, so revoked indicators drop out
     | where Active == true and ExpirationDateTime > now()
     | where isnotempty(NetworkIP)
-    | summarize arg_max(TimeGenerated, ThreatType, ConfidenceScore) by NetworkIP
+    | summarize arg_max(ConfidenceScore, ThreatType) by NetworkIP   // one row per IP keeps the join from duplicating hits
     | project NetworkIP, ThreatType, ConfidenceScore;
 CommonSecurityLog
 | where TimeGenerated > ago(1d)
@@ -550,7 +551,7 @@ The tool prints every returned row as a grid, followed by `(N row(s) returned)`,
 - **Scope:** `--database` (repeatable) limits discovery to the named databases. Use it whenever the user named a database. Omit it only when the user wants the whole cluster, and warn that a large cluster takes a while.
 - **Visibility:** `.show databases` returns only the databases the signed-in account can see. A named database that is missing is reported as a failure, usually meaning no access.
 - **Progress:** one line per database on stderr, with its table count and elapsed time. The final summary gives succeeded and failed counts for databases and tables.
-- **Failures:** databases or tables it cannot read appear with an empty `tables` or `columns` list — an empty list means *unreadable*, not *empty*.
+- **Failures:** each failed database or table gets an error or warning line on stderr, and the summary counts them. If anything failed, the partial schema is still saved and the tool exits 3. Do not read failure from the JSON: an empty `tables` or `columns` list can mean genuinely empty *or* unreadable, and a requested database that was not found is left out entirely. Go by the stderr lines.
 
 When the schema file is available, **always consult it first** to:
 - Use correct table and column names (no guessing)
