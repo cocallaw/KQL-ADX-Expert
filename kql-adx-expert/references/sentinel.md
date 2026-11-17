@@ -164,7 +164,10 @@ SigninLogs
 
 ```kql
 // Match outbound network connections against TI indicators
+// Lookback: indicators not re-ingested within 14 days are missed; widen if feeds refresh less often
 ThreatIntelligenceIndicator
+| where TimeGenerated > ago(14d)
+| summarize arg_max(TimeGenerated, *) by IndicatorId   // latest version first, so revoked indicators drop out
 | where Active == true and ExpirationDateTime > now()
 | where isnotempty(NetworkIP)
 | join kind=inner (
@@ -180,7 +183,9 @@ ThreatIntelligenceIndicator
 ```kql
 // Match file hashes from endpoint telemetry against TI
 ThreatIntelligenceIndicator
-| where Active == true
+| where TimeGenerated > ago(14d)
+| summarize arg_max(TimeGenerated, *) by IndicatorId   // latest version of each indicator
+| where Active == true and ExpirationDateTime > now()
 | where isnotempty(FileHashValue)
 | join kind=inner (
     DeviceFileEvents
